@@ -11,9 +11,8 @@ import (
 )
 
 func main() {
-	err := realMain()
-	if err != nil {
-		log.Fatalln("main: failed to exit successfully, err =", err)
+	if err := realMain(); err != nil {
+		log.Fatal(err)
 	}
 }
 

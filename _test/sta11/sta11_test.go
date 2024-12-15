@@ -3,7 +3,6 @@ package sta11_test
 import (
 	"reflect"
 	"testing"
-
 	"github.com/TechBowl-japan/go-stations/model"
 )
 

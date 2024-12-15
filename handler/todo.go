@@ -1,7 +1,9 @@
 package handler
 
 import (
+	"encoding/json"
 	"context"
+	"net/http"
 
 	"github.com/TechBowl-japan/go-stations/model"
 	"github.com/TechBowl-japan/go-stations/service"
@@ -41,4 +43,67 @@ func (h *TODOHandler) Update(ctx context.Context, req *model.UpdateTODORequest) 
 func (h *TODOHandler) Delete(ctx context.Context, req *model.DeleteTODORequest) (*model.DeleteTODOResponse, error) {
 	_ = h.svc.DeleteTODO(ctx, nil)
 	return &model.DeleteTODOResponse{}, nil
+}
+
+func (h *TODOHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodPost:
+		h.handleCreate(w, r)
+	case http.MethodPut:
+		h.handleUpdate(w, r)
+	default:
+		w.WriteHeader(http.StatusMethodNotAllowed)
+	}
+}
+
+func (h *TODOHandler) handleCreate(w http.ResponseWriter, r *http.Request) {
+	var req model.CreateTODORequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	// Subject is required
+	if req.Subject == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+
+	createdTodo, err := h.svc.CreateTODO(r.Context(), req.Subject, req.Description)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(model.CreateTODOResponse{TODO: createdTodo})
+}
+
+func (h *TODOHandler) handleUpdate(w http.ResponseWriter, r *http.Request) {
+	var req model.UpdateTODORequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	if req.ID == 0 || req.Subject == "" {
+        w.WriteHeader(http.StatusBadRequest)
+        return
+    }
+
+    updatedTodo, err := h.svc.UpdateTODO(r.Context(), int64(req.ID), req.Subject, req.Description)
+    if err != nil {
+        if _, ok := err.(*model.ErrNotFound); ok {
+            w.WriteHeader(http.StatusNotFound)
+        } else {
+            w.WriteHeader(http.StatusInternalServerError)
+        }
+        return
+    }
+
+    w.Header().Set("Content-Type", "application/json")
+    w.WriteHeader(http.StatusOK)
+    json.NewEncoder(w).Encode(model.UpdateTODOResponse{TODO: *updatedTodo})
 }
