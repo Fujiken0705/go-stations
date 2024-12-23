@@ -1,9 +1,10 @@
 package handler
 
 import (
-	"encoding/json"
 	"context"
+	"encoding/json"
 	"net/http"
+	"strconv"
 
 	"github.com/TechBowl-japan/go-stations/model"
 	"github.com/TechBowl-japan/go-stations/service"
@@ -51,6 +52,8 @@ func (h *TODOHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.handleCreate(w, r)
 	case http.MethodPut:
 		h.handleUpdate(w, r)
+	case http.MethodGet:
+		h.handleRead(w, r)
 	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
 	}
@@ -68,7 +71,6 @@ func (h *TODOHandler) handleCreate(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-
 
 	createdTodo, err := h.svc.CreateTODO(r.Context(), req.Subject, req.Description)
 	if err != nil {
@@ -89,21 +91,71 @@ func (h *TODOHandler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.ID == 0 || req.Subject == "" {
-        w.WriteHeader(http.StatusBadRequest)
-        return
-    }
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
 
-    updatedTodo, err := h.svc.UpdateTODO(r.Context(), int64(req.ID), req.Subject, req.Description)
-    if err != nil {
-        if _, ok := err.(*model.ErrNotFound); ok {
-            w.WriteHeader(http.StatusNotFound)
-        } else {
-            w.WriteHeader(http.StatusInternalServerError)
-        }
-        return
-    }
+	updatedTodo, err := h.svc.UpdateTODO(r.Context(), int64(req.ID), req.Subject, req.Description)
+	if err != nil {
+		if _, ok := err.(*model.ErrNotFound); ok {
+			w.WriteHeader(http.StatusNotFound)
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+		return
+	}
 
-    w.Header().Set("Content-Type", "application/json")
-    w.WriteHeader(http.StatusOK)
-    json.NewEncoder(w).Encode(model.UpdateTODOResponse{TODO: *updatedTodo})
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(model.UpdateTODOResponse{TODO: *updatedTodo})
+}
+
+func (h *TODOHandler) handleRead(w http.ResponseWriter, r *http.Request) {
+	//URLのクエリパラメータを取得しTODORequestに値を代入
+	query := r.URL.Query()
+	prevID := query.Get("prev_id")
+	size := query.Get("size")
+
+	var req model.ReadTODORequest
+
+	if prevID != "" {
+		parsedPrevID, err := strconv.ParseInt(prevID, 10, 64)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		req.PrevID = parsedPrevID
+	}
+
+	if size != "" {
+		parsedSize, err := strconv.Atoi(size)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		req.Size = parsedSize
+	} else {
+		req.Size = 10
+	}
+
+	// ReadTODO メソッドを呼び出し
+	todos, err := h.svc.ReadTODO(r.Context(), req.PrevID, int64(req.Size))
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// ReadTODOResponse を構築
+	response := model.ReadTODOResponse{
+		TODOs: []model.TODO{},
+	}
+	for _, todo := range todos {
+		response.TODOs = append(response.TODOs, *todo)
+	}
+
+	// JSON Encode を行い HTTP Response を返す
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(response)
+
 }
