@@ -54,6 +54,8 @@ func (h *TODOHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.handleUpdate(w, r)
 	case http.MethodGet:
 		h.handleRead(w, r)
+	case http.MethodDelete:
+		h.handleDelete(w, r)
 	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
 	}
@@ -158,4 +160,31 @@ func (h *TODOHandler) handleRead(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(response)
 
+}
+
+func (h *TODOHandler) handleDelete(w http.ResponseWriter, r *http.Request) {
+	var req model.DeleteTODORequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	if len(req.IDs) == 0 {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	err := h.svc.DeleteTODO(r.Context(), req.IDs)
+	if err != nil {
+		if _, ok := err.(*model.ErrNotFound); ok {
+			w.WriteHeader(http.StatusNotFound)
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(model.DeleteTODOResponse{})
 }
