@@ -3,6 +3,8 @@ package service
 import (
 	"context"
 	"database/sql"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/TechBowl-japan/go-stations/model"
@@ -188,6 +190,36 @@ func (s *TODOService) UpdateTODO(ctx context.Context, id int64, subject, descrip
 // DeleteTODO deletes TODOs on DB by ids.
 func (s *TODOService) DeleteTODO(ctx context.Context, ids []int64) error {
 	const deleteFmt = `DELETE FROM todos WHERE id IN (?%s)`
+
+    if len(ids) == 0 {
+        return nil
+    }
+
+    // 削除用のプレースホルダ（"?"）を生成
+	// 例: idリストが3つなら → "?%s" の %s 部分が ",?,?" に変換される
+	query := fmt.Sprintf(deleteFmt, strings.Repeat(",?", len(ids)-1))
+
+
+    args := make([]interface{}, 0, len(ids))
+
+    for _, id := range ids {
+        args = append(args, id)
+    }
+
+    res, err := s.db.ExecContext(ctx, query, args...)
+	if err != nil {
+		return err
+	}
+
+    rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+    if rowsAffected == 0 {
+		return &model.ErrNotFound{}
+	}
+
 
 	return nil
 }
