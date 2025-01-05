@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/TechBowl-japan/go-stations/db"
+	// "github.com/TechBowl-japan/go-stations/handler/middleware"
 	"github.com/TechBowl-japan/go-stations/handler/router"
 )
 
@@ -49,6 +50,8 @@ func realMain() error {
 
 	// NOTE: 新しいエンドポイントの登録はrouter.NewRouterの内部で行うようにする
 	mux := router.NewRouter(todoDB)
+
+	// recoveredmux := middleware.Recovery(mux)
 
 	// サーバーをlistenする
 	log.Printf("Server is listening on %s\n", port)
